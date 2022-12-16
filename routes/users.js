@@ -1,49 +1,35 @@
 const express = require("express");
 const router = express.Router();
+const Auth = require("../auth/index");
 const User = require("../models/user");
 
-// Get all users
-router.get("/", async (req, res) => {
-  try {
-    const users = await User.find();
-    res.json(users);
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
-});
-
-// Get a user
-router.get("/:id", getUser, (req, res) => {
-  res.json(res.user);
+// Get my user
+router.get("/:id", Auth.authentication, (req, res) => {
+  res.json(req.user);
 });
 
 // Create a user
-router.post("/", async (req, res) => {
-  const { username, email, password } = req.body;
-  if (await User.findOne({ email })) {
-    res.json({ message: "Email already exists!" });
-  } else {
-    const user = new User({
+router.post("/register", async (req, res) => {
+  try {
+    const { username, email, password } = req.body;
+    const hashPassword = await Auth.hash(password);
+    await new User({
       username,
       email,
-      password,
-    });
-
-    try {
-      const newUser = await user.save();
-      res.status(201).json(newUser);
-    } catch (err) {
-      res.status(400).json({ message: err.message });
-    }
+      password: hashPassword,
+    }).save();
+    res.status(201).json({ message: "Successfully registered!" });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
 });
 
 // Update a user
-router.patch("/:id", getUser, async (req, res) => {
+router.patch("/:id", Auth.authentication, async (req, res) => {
   try {
     if (req.body.email) {
-      res.user.email = req.body.email;
-      const updatedUser = await res.user.save();
+      req.user.email = req.body.email;
+      await req.user.save();
       res.status(200).json({ message: "User successfully updated!" });
     } else {
       res.status(400).json({ message: "Field cannot be updated!" });
@@ -54,28 +40,28 @@ router.patch("/:id", getUser, async (req, res) => {
 });
 
 // Delete a user
-router.delete("/:id", getUser, async (req, res) => {
+router.delete("/:id", Auth.authentication, async (req, res) => {
   try {
-    await res.user.remove();
+    await req.user.remove();
     res.json({ message: "User successfully deleted!" });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// Helping function
-async function getUser(req, res, next) {
-  let user;
+router.post("/login", async (req, res) => {
   try {
-    user = await User.findById(req.params.id);
-    if (user == null) {
-      return res.status(404).json({ message: "Not Found 404" });
+    const { username, password } = req.body;
+    const user = await User.findOne({ username });
+    const result = await Auth.decode(password, user.password);
+    if (result) {
+      return await Auth.sign({ username, email: user.email });
+    } else {
+      throw Error("Wrong password.");
     }
-  } catch (err) {
-    return res.status(500).json({ message: err.message });
+  } catch (error) {
+    res.status(403).json({ message: error.message });
   }
-  res.user = user;
-  next();
-}
+});
 
 module.exports = router;

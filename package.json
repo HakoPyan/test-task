@@ -18,7 +18,9 @@
   },
   "homepage": "https://github.com/HakoPyan/test-task#readme",
   "dependencies": {
+    "bcrypt": "^5.1.0",
     "express": "^4.18.2",
+    "jsonwebtoken": "^8.5.1",
     "mongoose": "^6.8.0"
   },
   "devDependencies": {
